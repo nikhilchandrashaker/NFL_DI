@@ -1,0 +1,381 @@
+<title>Missed Interception Dashboard</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one working surface. Header with the finding, a single filter row, then a sortable table whose rows expand in place. */
+:root{
+  --bg:#f5f6f8; --panel:#ffffff; --ink:#12161c; --ink2:#4b5360; --mute:#6f7885; --line:#dfe3e9;
+  --hover:#eef3fb; --int:#2a78d6; --mic:#eb6834; --accent:#2a78d6; --accent-ink:#ffffff; --chip:#e9edf3;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14171c; --panel:#1b1f26; --ink:#eceef2; --ink2:#b6bcc7; --mute:#8d95a2; --line:#2b313b;
+    --hover:#222a36; --int:#3987e5; --mic:#d95926; --accent:#3987e5; --accent-ink:#0b0f14; --chip:#262c36;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14171c; --panel:#1b1f26; --ink:#eceef2; --ink2:#b6bcc7; --mute:#8d95a2; --line:#2b313b;
+  --hover:#222a36; --int:#3987e5; --mic:#d95926; --accent:#3987e5; --accent-ink:#0b0f14; --chip:#262c36;
+  color-scheme:dark;
+}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans);
+  padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1{font-size:22px;line-height:1.2;margin:0;font-weight:600;text-wrap:balance}
+.sub{color:var(--ink2);margin:4px 0 0;max-width:68ch}
+.strip{display:flex;flex-wrap:wrap;gap:6px 20px;margin-top:12px;font-size:13px;color:var(--ink2)}
+.strip b{font-family:var(--mono);font-weight:500;color:var(--ink)}
+nav.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+nav.tabs a{padding:8px 12px;color:var(--ink2);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-1px;font-weight:500}
+nav.tabs a[aria-current="page"]{color:var(--ink);border-color:var(--accent)}
+nav.tabs a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.filters{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:end}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
+input[type=search],input[type=number],select{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:7px 10px;min-width:0}
+input[type=search]{width:min(320px,100%)}
+input[type=number]{width:78px;font-family:var(--mono)}
+.chips{display:flex;gap:4px}
+.chips button{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink2);padding:7px 12px;border-radius:6px;cursor:pointer}
+.chips button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.count{margin-left:auto;color:var(--mute);font-size:13px;align-self:center}
+.legend{display:flex;gap:16px;font-size:12px;color:var(--ink2)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:720px}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--mute);font-weight:500;position:sticky;top:0;background:var(--panel)}
+th button{all:unset;cursor:pointer;display:inline-flex;gap:4px;align-items:center}
+th button:focus-visible{outline:2px solid var(--accent)}
+th.n,td.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+th.n button{justify-content:flex-end}
+tr.row:hover{background:var(--hover)}
+td.name button{all:unset;cursor:pointer;font-weight:500;display:inline-flex;gap:8px;align-items:center}
+td.name button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+td.name .car{display:inline-block;width:10px;color:var(--mute);transition:transform .12s}
+td.name button[aria-expanded="true"] .car{transform:rotate(90deg)}
+.bar{display:inline-flex;gap:2px;vertical-align:middle;margin-left:10px;height:10px}
+.bar span{display:block;height:10px;min-width:2px}
+.bar .i{background:var(--int);border-radius:2px 0 0 2px}.bar .m{background:var(--mic);border-radius:0 2px 2px 0}
+.pos{color:var(--ink2)}
+.pill{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:10px;background:var(--chip);color:var(--ink)}
+.pill::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px}
+.pill.int::before{background:var(--int)}.pill.mic::before{background:var(--mic)}
+tr.detail td{background:var(--bg);white-space:normal;padding:14px 16px}
+.dgrid{display:grid;grid-template-columns:minmax(240px,320px) minmax(0,1fr);gap:20px}
+@media (max-width:760px){.dgrid{grid-template-columns:minmax(0,1fr)}}
+.dgrid h3{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin:0 0 8px;font-weight:500}
+.ev{max-height:230px;overflow:auto;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+.ev div{padding:6px 10px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:auto auto 1fr;gap:4px 10px;align-items:baseline;font-size:12.5px}
+.ev div:last-child{border:0}
+.ev .w{font-family:var(--mono);color:var(--mute);font-size:12px}
+.ev .d{grid-column:1/-1;color:var(--ink2);font-size:12px;overflow-wrap:anywhere}
+svg text{fill:var(--ink2);font-family:var(--mono);font-size:11px}
+svg .ax{stroke:var(--line)}
+.method{padding:20px 22px;display:flex;flex-direction:column;gap:14px;line-height:1.6}
+.method h2{font-size:15px;margin:6px 0 0}
+.method p,.method ul{margin:0;max-width:74ch;color:var(--ink2)}
+.method ul{padding-left:18px}
+.method code{font-family:var(--mono);font-size:12.5px;background:var(--chip);padding:1px 5px;border-radius:4px;color:var(--ink)}
+.note{color:var(--mute);font-size:12px}
+.empty{padding:28px;text-align:center;color:var(--mute)}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Missed Interception Dashboard</h1>
+    <p class="sub" id="sub"></p>
+    <div class="strip" id="strip"></div>
+  </header>
+
+  <nav class="tabs" aria-label="Views">
+    <a href="#players" data-tab="players">Players</a>
+    <a href="#teams" data-tab="teams">Teams</a>
+    <a href="#method" data-tab="method">Method and findings</a>
+  </nav>
+
+  <div class="filters" id="filters">
+      <div class="field" id="measurefield"><label>Measure</label>
+        <div class="chips" id="measure">
+          <button type="button" data-v="M" aria-pressed="true">Charted chances, 2022–26</button>
+          <button type="button" data-v="L" aria-pressed="false">Passes defended, 1999–26</button>
+        </div></div>
+      <div class="field"><label for="q">Search</label><input id="q" type="search" placeholder="Player, team or position" autocomplete="off"></div>
+      <div class="field"><label for="season">Season</label><select id="season"></select></div>
+      <div class="field" id="posfield"><label>Position</label>
+        <div class="chips" id="pos">
+          <button type="button" data-v="ALL" aria-pressed="true">All</button>
+          <button type="button" data-v="CB" aria-pressed="false">CB</button>
+          <button type="button" data-v="S" aria-pressed="false">S</button>
+          <button type="button" data-v="LB" aria-pressed="false">LB</button>
+        </div></div>
+      <div class="field" id="minfield"><label for="min">Min chances</label><input id="min" type="number" min="1" max="30" value="1"></div>
+      <span class="count" id="count" aria-live="polite"></span>
+    </div>
+
+  <section id="view-players" hidden>
+    <div class="legend" style="margin:10px 0 8px"><span><i style="background:var(--int)"></i>Interception (INT)</span><span><i style="background:var(--mic)"></i><span class="lgm">Missed-INT chance (MIC)</span></span></div>
+    <div class="card tablewrap"><table id="ptable"></table><div class="empty" id="pempty" hidden>No defenders match this search.</div></div>
+  </section>
+
+  <section id="view-teams" hidden>
+    <div class="legend" style="margin:0 0 8px"><span><i style="background:var(--int)"></i>INT</span><span><i style="background:var(--mic)"></i><span class="lgm">MIC</span></span></div>
+    <div class="card tablewrap"><table id="ttable"></table><div class="empty" id="tempty" hidden>No team matches this search.</div></div>
+  </section>
+
+  <section id="view-method" hidden><div class="card method" id="method"></div></section>
+</div>
+
+<script type="application/json" id="data">/*DATA*/</script>
+<script>
+(function(){
+"use strict";
+var D=JSON.parse(document.getElementById("data").textContent);
+var P=D.P,E=D.E,T=D.T,PRI=D.PRI,M=D.META,LR=D.L,LT=D.LT,PRIL=D.PRIL;
+var state={tab:"players",measure:"M",q:"",season:"all",pos:"ALL",min:1,sort:{players:["c",-1],teams:["c",-1]},open:{}};
+var CAP=400;
+function isM(){return state.measure==="M"}
+function seasons(){var a=[],lo=isM()?2022:1999;for(var y=lo;y<=2026;y++)a.push(y);return a}
+function lab(){return isM()?{m:"MIC",mtip:"Missed-INT chances",cr:"Convert",crtip:"INT divided by chances",extra:"INT + MIC"}:{m:"PD",mtip:"Other passes defended",cr:"INT share",crtip:"INT divided by (INT + PD)",extra:"INT + PD"}}
+var $=function(id){return document.getElementById(id)};
+function el(tag,attrs,kids){var e=document.createElement(tag);if(attrs)for(var k in attrs){if(k==="text")e.textContent=attrs[k];else e.setAttribute(k,attrs[k]);}(kids||[]).forEach(function(c){if(c)e.appendChild(c)});return e}
+var pct=function(x){return Math.round(x*100)+"%"};
+var sgn=function(x){return (x>0?"+":x<0?"−":"")+Math.abs(x).toFixed(1)};
+function seasonLabel(s){return s===2026?"2026 (to Wk "+M.last_week+")":String(s)}
+
+/* header strip */
+function renderStrip(){
+  var st=$("strip");st.textContent="";
+  var g=isM()?M.pos_rates:M.pos_rates_l;
+  [["CB",g.CB],["S",g.S],["LB",g.LB]].forEach(function(p){
+    var sp=el("span");sp.appendChild(el("b",{text:p[0]+" "+pct(p[1])}));st.appendChild(sp)});
+  if(isM()){
+    st.appendChild(el("span",{text:"of chances become interceptions (2022\u20132025)"}));
+    st.appendChild(el("span",{text:M.n_events.toLocaleString()+" events \u00b7 "+M.n_players+" defenders \u00b7 through Week "+M.last_week+", 2026"}));
+    $("sub").textContent="Every interception chance by NFL defenders since 2022: the picks, and the interception-worthy throws a defensive back or linebacker got a hand on and did not catch.";
+  }else{
+    st.appendChild(el("span",{text:"of interceptions plus breakups are interceptions (1999\u20132025)"}));
+    st.appendChild(el("span",{text:M.n_events_l.toLocaleString()+" events \u00b7 "+M.n_players_l.toLocaleString()+" defenders \u00b7 1999 to Week "+M.last_week+", 2026"}));
+    $("sub").textContent="Every interception and pass breakup by NFL defensive backs and linebackers since 1999. Breakups are a loose stand-in for missed chances: most were never catchable.";
+  }
+}
+
+/* season select */
+function fillSeasons(){
+  var sel=$("season");sel.textContent="";var ys=seasons();
+  sel.appendChild(el("option",{value:"all",text:"All seasons ("+ys[0]+"\u20132026)"}));
+  ys.slice().reverse().forEach(function(y){sel.appendChild(el("option",{value:String(y),text:seasonLabel(y)}))});
+  sel.value="all";
+}
+
+/* aggregation */
+function prior(g){var Q=isM()?PRI:PRIL;return Q[g]||Q.ALL}
+function aggPlayers(){
+  var by={};
+  (isM()?P:LR).forEach(function(r){
+    if(state.season!=="all"&&r.s!==+state.season)return;
+    var a=by[r.id];
+    if(!a){a=by[r.id]={id:r.id,n:r.n,pos:r.pos,g:r.g,f:r.g,t:r.t,s:r.s,i:0,m:0,x:0}}
+    a.i+=r.i;a.m+=r.m;a.x+=r.x;
+    if(r.s>=a.s){a.t=r.t;a.pos=r.pos;a.s=r.s;a.n=r.n}
+  });
+  return Object.keys(by).map(function(k){var a=by[k];a.c=a.i+a.m;a.cr=a.i/a.c;var p=prior(a.g);a.eb=(p[0]+a.i)/(p[0]+p[1]+a.c);return a});
+}
+function aggTeams(){
+  var by={};
+  (isM()?T:LT).forEach(function(r){
+    if(state.season!=="all"&&r.s!==+state.season)return;
+    var a=by[r.t]||(by[r.t]={n:r.t,t:r.t,i:0,m:0});a.i+=r.i;a.m+=r.m});
+  return Object.keys(by).map(function(k){var a=by[k];a.c=a.i+a.m;a.cr=a.c?a.i/a.c:0;return a});
+}
+function matches(r){
+  var q=state.q.trim().toLowerCase();if(!q)return true;
+  var hay=((r.n||"")+" "+(r.t||"")+" "+(r.pos||"")+" "+(r.g||"")).toLowerCase();
+  return q.split(/\s+/).every(function(w){return hay.indexOf(w)>-1});
+}
+function sortRows(rows,key,dir){
+  rows.sort(function(a,b){
+    var x=a[key],y=b[key];
+    var d=typeof x==="string"?x.localeCompare(y):(x-y);
+    if(d===0)d=b.c-a.c||String(a.n).localeCompare(String(b.n));
+    return d*dir});
+  return rows;
+}
+
+/* table header */
+function header(cols,tabKey){
+  var tr=el("tr");
+  cols.forEach(function(c){
+    var th=el("th",{scope:"col"});if(c.num)th.className="n";
+    var cur=state.sort[tabKey];
+    th.setAttribute("aria-sort",cur[0]===c.k?(cur[1]>0?"ascending":"descending"):"none");
+    var b=el("button",{type:"button",title:c.tip||"Sort"});
+    b.appendChild(document.createTextNode(c.l));
+    if(cur[0]===c.k)b.appendChild(document.createTextNode(cur[1]>0?" ▲":" ▼"));
+    b.addEventListener("click",function(){
+      var c0=state.sort[tabKey];
+      var text=(c.k==="n"||c.k==="t"||c.k==="pos");
+      state.sort[tabKey]=c0[0]===c.k?[c.k,-c0[1]]:[c.k,text?1:-1];
+      render()});
+    th.appendChild(b);tr.appendChild(th)});
+  var thead=el("thead");thead.appendChild(tr);return thead;
+}
+function miniBar(r,max){
+  var w=function(v){return Math.max(v?2:0,Math.round(v/max*90))};
+  var b=el("span",{"class":"bar","aria-hidden":"true"});
+  if(r.i)b.appendChild(el("span",{"class":"i",style:"width:"+w(r.i)+"px"}));
+  if(r.m)b.appendChild(el("span",{"class":"m",style:"width:"+w(r.m)+"px"}));
+  return b;
+}
+
+/* player detail */
+function seasonChart(id){
+  var mine=(isM()?P:LR).filter(function(p){return p.id===id});
+  var lo=isM()?2022:Math.min.apply(null,mine.map(function(p){return p.s}));
+  var hi=isM()?2026:Math.max.apply(null,mine.map(function(p){return p.s}));
+  var rows=[];
+  for(var y=lo;y<=hi;y++){(function(y){var r=mine.filter(function(p){return p.s===y})[0];rows.push({y:y,i:r?r.i:0,m:r?r.m:0})})(y)}
+  var n=rows.length,L=lab();
+  var max=Math.max.apply(null,rows.map(function(r){return r.i+r.m}).concat([4]));
+  var W=300,H=150,pl=26,pb=22,pt=20,slot=(W-pl)/n,bw=Math.min(34,slot*0.72),gap=slot-bw;
+  var NS="http://www.w3.org/2000/svg";
+  var svg=document.createElementNS(NS,"svg");svg.setAttribute("viewBox","0 0 "+W+" "+H);svg.setAttribute("role","img");
+  svg.setAttribute("aria-label","INT and "+L.m+" by season: "+rows.map(function(r){return r.y+" "+r.i+" INT, "+r.m+" "+L.m}).join("; "));
+  svg.style.cssText="width:100%;max-width:340px;height:auto;display:block";
+  function mk(nm,at){var e=document.createElementNS(NS,nm);for(var k in at)e.setAttribute(k,at[k]);return e}
+  var sy=function(v){return H-pb-(H-pb-pt)*v/max};
+  var stp=max>16?8:(max>8?4:2);
+  for(var t=0;t<=max;t+=stp){svg.appendChild(mk("line",{x1:pl,x2:W,y1:sy(t),y2:sy(t),"class":"ax"}));var tx=mk("text",{x:pl-5,y:sy(t)+4,"text-anchor":"end"});tx.textContent=t;svg.appendChild(tx)}
+  var step=n>12?Math.ceil(n/7):1;
+  rows.forEach(function(r,k){
+    var x=pl+gap/2+k*(bw+gap);
+    var g=mk("g",{});var ti=document.createElementNS(NS,"title");ti.textContent=r.y+": "+r.i+" INT, "+r.m+" "+L.m;g.appendChild(ti);
+    if(r.i){g.appendChild(mk("rect",{x:x,y:sy(r.i),width:bw,height:sy(0)-sy(r.i),fill:"var(--int)",rx:n>12?1:2}))}
+    if(r.m){var y0=sy(r.i)-(n>12?1:2);g.appendChild(mk("rect",{x:x,y:sy(r.i+r.m),width:bw,height:Math.max(0,y0-sy(r.i+r.m)+(r.i?0:2)),fill:"var(--mic)",rx:n>12?1:2}))}
+    if(n<=12&&r.i+r.m){var lt=mk("text",{x:x+bw/2,y:sy(r.i+r.m)-4,"text-anchor":"middle"});lt.textContent=(r.i+r.m);g.appendChild(lt)}
+    if(k%step===0){var yl=mk("text",{x:x+bw/2,y:H-6,"text-anchor":"middle"});yl.textContent=(n>12?String(r.y):String(r.y).slice(2))+(r.y===2026?"*":"");g.appendChild(yl)}
+    svg.appendChild(g)});
+  return svg;
+}
+function detailRow(r,span){
+  var tr=el("tr",{"class":"detail"});var td=el("td",{colspan:String(span)});
+  var grid=el("div",{"class":"dgrid"});
+  var a=el("div");a.appendChild(el("h3",{text:"By season ("+lab().extra+")"}));a.appendChild(seasonChart(r.id));
+  a.appendChild(el("p",{"class":"note",text:"* 2026 through Week "+M.last_week+(isM()?". Bar label is total chances.":". Hover a bar for its counts.")}));
+  var b=el("div");
+  if(!isM()){b.appendChild(el("h3",{text:"About this view"}));b.appendChild(el("p",{"class":"note",text:"Play-by-play detail is available for charted chances (2022\u20132026). Passes defended include many throws no defender could have caught, so INT share runs far below the charted conversion rate."}));grid.appendChild(a);grid.appendChild(b);td.appendChild(grid);tr.appendChild(td);return tr}
+  b.appendChild(el("h3",{text:"Plays"+(state.season==="all"?"":" in "+state.season)}));
+  var evs=E.filter(function(e){return e.id===r.id&&(state.season==="all"||e.s===+state.season)}).sort(function(x,y){return y.s-x.s||y.w-x.w});
+  var box=el("div",{"class":"ev",tabindex:"0",role:"region","aria-label":"Plays for "+r.n});
+  evs.forEach(function(e){
+    var d=el("div");
+    d.appendChild(el("span",{"class":"w",text:e.s+" · Wk "+e.w}));
+    d.appendChild(el("span",{"class":"pill "+(e.k==="INT"?"int":"mic"),text:e.k}));
+    d.appendChild(el("span",{text:"vs "+e.o+(e.qb?" · "+e.qb:"")+(e.rc?" to "+e.rc:"")}));
+    d.appendChild(el("span",{"class":"d",text:e.d}));
+    box.appendChild(d)});
+  if(!evs.length)box.appendChild(el("div",{text:"No plays in this season."}));
+  b.appendChild(box);
+  grid.appendChild(a);grid.appendChild(b);td.appendChild(grid);tr.appendChild(td);return tr;
+}
+
+/* players view */
+function renderPlayers(){
+  var all=aggPlayers();
+  var rows=all.filter(function(r){return (state.pos==="ALL"||r.f===state.pos)&&r.c>=state.min&&matches(r)});
+  var s=state.sort.players;sortRows(rows,s[0],s[1]);
+  var max=Math.max.apply(null,rows.map(function(r){return r.c}).concat([1]));
+  var L=lab();
+  var cols=[{k:"n",l:"Player"},{k:"pos",l:"Pos"},{k:"t",l:"Team"},{k:"i",l:"INT",num:1},{k:"m",l:L.m,num:1,tip:L.mtip},{k:"c",l:"Chances",num:1,tip:L.extra},
+    {k:"cr",l:L.cr,num:1,tip:L.crtip},{k:"eb",l:"Shrunk",num:1,tip:"Conversion rate pulled toward the position average in proportion to how little data there is (empirical Bayes)"},
+    {k:"x",l:"INT vs exp",num:1,tip:"INTs minus the league conversion rate for the position times chances"}];
+  var t=$("ptable");t.textContent="";t.appendChild(header(cols,"players"));
+  var tb=el("tbody");
+  var total=rows.length;rows=rows.slice(0,CAP);
+  rows.forEach(function(r){
+    var open=!!state.open[r.id];
+    var tr=el("tr",{"class":"row"});
+    var nm=el("td",{"class":"name"});
+    var btn=el("button",{type:"button","aria-expanded":open?"true":"false"});
+    btn.appendChild(el("span",{"class":"car","aria-hidden":"true",text:"▸"}));btn.appendChild(document.createTextNode(r.n));
+    btn.addEventListener("click",function(){if(state.open[r.id])delete state.open[r.id];else state.open[r.id]=1;render()});
+    nm.appendChild(btn);tr.appendChild(nm);
+    tr.appendChild(el("td",{"class":"pos",text:r.pos||r.g}));tr.appendChild(el("td",{text:r.t}));
+    tr.appendChild(el("td",{"class":"n",text:r.i}));tr.appendChild(el("td",{"class":"n",text:r.m}));
+    var c=el("td",{"class":"n"});c.appendChild(document.createTextNode(r.c));c.appendChild(miniBar(r,max));tr.appendChild(c);
+    tr.appendChild(el("td",{"class":"n",text:pct(r.cr)}));tr.appendChild(el("td",{"class":"n",text:pct(r.eb)}));
+    tr.appendChild(el("td",{"class":"n",text:sgn(r.x)}));
+    tb.appendChild(tr);
+    if(open)tb.appendChild(detailRow(r,cols.length));
+  });
+  t.appendChild(tb);
+  $("pempty").hidden=total>0;
+  $("count").textContent=(total>CAP?"First "+CAP+" of "+total+" matches (narrow the search to see the rest) \u00b7 ":"")+"Showing "+rows.length+" of "+all.length+" defenders";
+}
+
+/* teams view */
+function renderTeams(){
+  var rows=aggTeams().filter(matches);var s=state.sort.teams;sortRows(rows,s[0],s[1]);
+  var max=Math.max.apply(null,rows.map(function(r){return r.c}).concat([1]));
+  var cols=[{k:"t",l:"Team"},{k:"i",l:"INT",num:1},{k:"m",l:lab().m,num:1},{k:"c",l:"Chances",num:1},{k:"cr",l:lab().cr,num:1}];
+  var t=$("ttable");t.textContent="";t.appendChild(header(cols,"teams"));
+  var tb=el("tbody");
+  rows.forEach(function(r){
+    var tr=el("tr",{"class":"row"});tr.appendChild(el("td",{text:r.t,style:"font-weight:500"}));
+    tr.appendChild(el("td",{"class":"n",text:r.i}));tr.appendChild(el("td",{"class":"n",text:r.m}));
+    var c=el("td",{"class":"n"});c.appendChild(document.createTextNode(r.c));c.appendChild(miniBar(r,max));tr.appendChild(c);
+    tr.appendChild(el("td",{"class":"n",text:pct(r.cr)}));tb.appendChild(tr)});
+  t.appendChild(tb);$("tempty").hidden=rows.length>0;
+}
+
+/* method view */
+function renderMethod(){
+  var m=$("method");m.textContent="";
+  function h(t){m.appendChild(el("h2",{text:t}))}
+  function p(t){m.appendChild(el("p",{text:t}))}
+  function ul(a){var u=el("ul");a.forEach(function(t){u.appendChild(el("li",{text:t}))});m.appendChild(u)}
+  h("Charted chances, 2022\u20132026");
+  p("INT is an interception credited to a defender in nflverse play-by-play. MIC is a missed-INT chance: a throw FTN charters marked interception-worthy that fell incomplete while a defensive back or linebacker was credited with the pass defense. Chances are INT plus MIC, and Convert is INT divided by chances.");
+  p("MIC is a stand-in for a dropped interception, not a count of them. It also includes legitimate break-ups on bad throws, so it is an upper bound on true drops. Defensive linemen are excluded because their pass defenses are batted balls.");
+  ul(M.findings);
+  h("Passes defended, 1999\u20132026");
+  p("FTN\u2019s charting starts in 2022, so for earlier years the only available stand-in is the pass defense itself. PD is a pass defense credited to a defensive back or linebacker on an incomplete pass. INT share is INT divided by INT plus PD. Most breakups were never catchable, so the share is far lower than the charted conversion rate; only 14% of breakups in 2022\u20132025 were also charted as interception-worthy.");
+  ul(M.findings_l);
+  h("Read the table with this in mind");
+  ul(["Many player-seasons contain only one or two chances. Use the Shrunk column, not the raw rate, to compare defenders.","FTN\u2019s interception-worthy flag was applied about 40% less often in 2025 than in 2022, so charted totals are not comparable across seasons without adjusting for that. Passes defended have no such drift.","Position comes from each season\u2019s roster. Rosters before 2002 sometimes list only \u201cDB\u201d, so a few early defenders appear under All but under no position chip.","2026 is a partial season."]);
+  m.appendChild(el("p",{"class":"note",text:"Sources: nflverse play-by-play and rosters, and FTN charting data via nflverse (see nflverse for the FTN data license and attribution terms). Charted chances exist only from 2022."}));
+}
+
+/* controls */
+var timer;
+$("q").addEventListener("input",function(e){clearTimeout(timer);var v=e.target.value;timer=setTimeout(function(){state.q=v;render()},120)});
+$("season").addEventListener("change",function(e){state.season=e.target.value;state.open={};render()});
+$("min").addEventListener("input",function(e){state.min=Math.max(1,+e.target.value||1);render()});
+$("measure").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;state.measure=b.dataset.v;state.season="all";state.open={};
+  Array.prototype.forEach.call($("measure").children,function(x){x.setAttribute("aria-pressed",x===b?"true":"false")});fillSeasons();renderStrip();render()});
+$("pos").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;state.pos=b.dataset.v;
+  Array.prototype.forEach.call($("pos").children,function(x){x.setAttribute("aria-pressed",x===b?"true":"false")});render()});
+
+function route(){var h=(location.hash||"#players").slice(1);state.tab=["players","teams","method"].indexOf(h)>-1?h:"players";render()}
+window.addEventListener("hashchange",route);
+
+function render(){
+  ["players","teams","method"].forEach(function(t){
+    $("view-"+t).hidden=state.tab!==t;
+    var a=document.querySelector('[data-tab="'+t+'"]');if(t===state.tab)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")});
+  $("filters").hidden=state.tab==="method";
+  Array.prototype.forEach.call(document.querySelectorAll(".lgm"),function(e){e.textContent=isM()?"Missed-INT chance (MIC)":"Other pass defended (PD)"});
+  var tm=state.tab==="teams";$("posfield").hidden=tm;$("minfield").hidden=tm;$("count").hidden=tm;
+  if(state.tab==="players")renderPlayers();
+  else if(state.tab==="teams")renderTeams();
+  else renderMethod();
+}
+fillSeasons();renderStrip();
+route();
+})();
+</script>
